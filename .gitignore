@@ -1,0 +1,14 @@
+*.swp
+*.gz
+
+*/target/
+*/project/
+
+# Python
+*.pyc
+__pycache__/
+
+# Projects dependent files/folders
+spark-consumer/checkpoint
+
+data/
