@@ -25,16 +25,22 @@ def parse_args():
     arg_parser.add_argument('-o', '--output',
                             help='Write crawling ouput to the given file',
                             required=False)
+    arg_parser.add_argument('-b', '--broker',
+                            help='Broker on which the connection is established.',
+                            required=False)
+    arg_parser.add_argument('-p', '--producer',
+                            help='Id of the Kafka topic to produce to. \'movie-topic\' by default.',
+                            required=False)
 
     return arg_parser.parse_args()
 
-def stream_file(file_path, kafka_handler):
+def stream_file(file_path, kafka_handler, topic):
     with open(file_path, "r") as f:
         for line in f:
-            kafka_handler.produce(line, 'movie-topic')
+            kafka_handler.produce(line, topic)
         kafka_handler.flush()
 
-def stream_from_api(kafka_handler):
+def stream_from_api(kafka_handler, topic):
     THEMOVIEDB_API_TOKEN = "2cde1ceaa291c9271e32272dc26200fe"
     
     MOVIES_ROUTE_API = "https://api.themoviedb.org/3/discover/movie"
@@ -49,8 +55,8 @@ def stream_from_api(kafka_handler):
     def callback(movies):
         for movie in movies:
             string = json.dumps(movie)
-            print("[KAFKA] Movie `{}` pushed to topic \'{}\'".format(movie["title"], 'movie-topic'))
-            kafka_handler.produce(string, 'movie-topic')
+            print("[KAFKA] Movie `{}` pushed to topic \'{}\'".format(movie["title"], topic))
+            kafka_handler.produce(string, topic)
         kafka_handler.flush()
     
     MIN_YEAR = 2001
@@ -64,18 +70,23 @@ def stream_from_api(kafka_handler):
     crawler.stop()
 
 if __name__ == "__main__":
-    kafka_handler = KafkaProducerWrapper()
+    args = parse_args()
+
+    if args.broker is None:
+        args.broker = 'localhost:9092'
+    if args.producer is None:
+        args.producer = 'movie-topic'
+
+    kafka_handler = KafkaProducerWrapper(args.broker)
 
     # Catch SIGINT to stop the script properly
     def exit_script(signal, frame):
         print('[FETCHER] Stopping the fetch...')
         kafka_handler.flush()
         exit(0)
-
     signal.signal(signal.SIGINT, exit_script)
 
-    args = parse_args()
     if not(args.input is None):
-        stream_file(args.input, kafka_handler)
+        stream_file(args.input, kafka_handler, args.producer)
     else:
-        stream_from_api(kafka_handler)
+        stream_from_api(kafka_handler, args.producer)

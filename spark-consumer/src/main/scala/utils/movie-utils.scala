@@ -9,7 +9,8 @@ object MovieUtils {
         author : String,
         id : String,
         url : String,
-        content : String
+        content : String,
+        analysis : Int
     )
     object Review {
         implicit val reviewFormat = Json.format[Review]
