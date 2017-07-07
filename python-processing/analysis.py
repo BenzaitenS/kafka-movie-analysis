@@ -134,10 +134,16 @@ def process_from_pipe():
             #movie["review_analysis"] = []
             # Adds a new list to the movie, composed of
             # 1 for positive review, and 0 for negative ones.
+            review_popularity = 0
             for r in movie["reviews"]:
                 content = r["content"]
                 val = 1 if svm.project([content]) == "pos" else 0
-                r["analysis"] = val                
+                r["analysis"] = val
+                review_popularity = review_popularity + val
+
+            review_popularity = (review_popularity / len(movie["reviews"]) * 100.0)
+
+            movie["review_popularity"] = review_popularity
             # Writes processed movie with sentiment analyses to
             # output topic.
             string_movie = json.dumps(movie)
