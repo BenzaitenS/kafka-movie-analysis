@@ -24,11 +24,11 @@
       "id" : "002FD47C8387498C8898D38143240A59"
     },
     "cell_type" : "code",
-    "source" : "import org.apache.spark.SparkConf\nimport org.apache.spark.streaming.kafka.KafkaUtils\nimport org.apache.spark.streaming.{Seconds, StreamingContext}\nimport kafka.serializer.StringDecoder\n//import play.api.libs.json._\nimport play.api.libs.json.Json",
+    "source" : "import org.apache.spark.SparkConf\nimport org.apache.spark.streaming.kafka.KafkaUtils\nimport org.apache.spark.streaming.{Seconds, StreamingContext}\nimport kafka.serializer.StringDecoder\nimport org.apache.kafka.common.serialization.StringDeserializer\n//import play.api.libs.json._\nimport play.api.libs.json.Json",
     "outputs" : [ {
       "name" : "stdout",
       "output_type" : "stream",
-      "text" : "import org.apache.spark.SparkConf\nimport org.apache.spark.streaming.kafka.KafkaUtils\nimport org.apache.spark.streaming.{Seconds, StreamingContext}\nimport kafka.serializer.StringDecoder\nimport play.api.libs.json.Json\n"
+      "text" : "import org.apache.spark.SparkConf\nimport org.apache.spark.streaming.kafka.KafkaUtils\nimport org.apache.spark.streaming.{Seconds, StreamingContext}\nimport kafka.serializer.StringDecoder\nimport org.apache.kafka.common.serialization.StringDeserializer\nimport play.api.libs.json.Json\n"
     }, {
       "metadata" : { },
       "data" : {
@@ -36,7 +36,7 @@
       },
       "output_type" : "execute_result",
       "execution_count" : 1,
-      "time" : "Took: 4 seconds 386 milliseconds, at 2017-7-8 17:47"
+      "time" : "Took: 3 seconds 888 milliseconds, at 2017-7-8 20:29"
     } ]
   }, {
     "metadata" : {
@@ -58,7 +58,7 @@
       },
       "output_type" : "execute_result",
       "execution_count" : 2,
-      "time" : "Took: 5 seconds 906 milliseconds, at 2017-7-8 17:48"
+      "time" : "Took: 4 seconds 968 milliseconds, at 2017-7-8 20:30"
     } ]
   }, {
     "metadata" : {
@@ -80,7 +80,7 @@
       },
       "output_type" : "execute_result",
       "execution_count" : 3,
-      "time" : "Took: 3 seconds 424 milliseconds, at 2017-7-8 17:48"
+      "time" : "Took: 3 seconds 247 milliseconds, at 2017-7-8 20:30"
     } ]
   }, {
     "metadata" : {
@@ -90,19 +90,19 @@
       "id" : "9FB2D49218394BE1B4B9D52E777F3976"
     },
     "cell_type" : "code",
-    "source" : "val ssc = StreamingContext.getActiveOrCreate(() => new StreamingContext(sc, Seconds(1)))\n\nval kafkaParams = Map[String, String](\"bootstrap.servers\" -> brokers)\nval stream = KafkaUtils.createDirectStream[String, String, StringDecoder, StringDecoder](\n      ssc, kafkaParams, Set(topic)\n)",
+    "source" : "val ssc = StreamingContext.getActiveOrCreate(() => new StreamingContext(sc, Seconds(10)))\n\n//val kafkaParams = Map[String, String](\"bootstrap.servers\" -> brokers)\nval kafkaParams = Map[String, String] (\n  \"bootstrap.servers\" -> brokers,\n  \"group.id\" -> \"my-group\",\n  \"auto.offset.reset\" -> \"smallest\",\n  \"enable.auto.commit\" -> \"false\"\n)\n\nval stream = KafkaUtils.createDirectStream[String, String, StringDecoder, StringDecoder](\n      ssc, kafkaParams, Set(topic)\n)",
     "outputs" : [ {
       "name" : "stdout",
       "output_type" : "stream",
-      "text" : "ssc: org.apache.spark.streaming.StreamingContext = org.apache.spark.streaming.StreamingContext@2898c4b3\nkafkaParams: scala.collection.immutable.Map[String,String] = Map(bootstrap.servers -> localhost:9092)\nstream: org.apache.spark.streaming.dstream.InputDStream[(String, String)] = org.apache.spark.streaming.kafka.DirectKafkaInputDStream@58a4fb18\n"
+      "text" : "ssc: org.apache.spark.streaming.StreamingContext = org.apache.spark.streaming.StreamingContext@62b4472a\nkafkaParams: scala.collection.immutable.Map[String,String] = Map(bootstrap.servers -> localhost:9092, group.id -> my-group, auto.offset.reset -> smallest, enable.auto.commit -> false)\nstream: org.apache.spark.streaming.dstream.InputDStream[(String, String)] = org.apache.spark.streaming.kafka.DirectKafkaInputDStream@1647f9d\n"
     }, {
       "metadata" : { },
       "data" : {
         "text/html" : ""
       },
       "output_type" : "execute_result",
-      "execution_count" : 4,
-      "time" : "Took: 5 seconds 791 milliseconds, at 2017-7-8 17:48"
+      "execution_count" : 27,
+      "time" : "Took: 3 seconds 314 milliseconds, at 2017-7-8 20:45"
     } ]
   }, {
     "metadata" : {
@@ -112,18 +112,38 @@
       "id" : "3E67AA5A8C664319883A11CA7E2C62B2"
     },
     "cell_type" : "code",
-    "source" : "val toJson = stream.map(_._2)\n                    .map(Json.parse(_).as[MovieRaw])\n\ntoJson.foreachRDD { rdd =>\n  rdd.foreach(x => println(x.original_title))\n  \n  /*rdd.map(movie => (movie.original_language, movie))\n                        .groupByKey()\n                        .collect()*/\n}\n\n/*val byLanguages = toJson.map(movie => (movie.original_language, movie))\n                        .groupByKey()\n                        .collect()*/\n\nssc.start()\nssc.awaitTermination()",
-    "outputs" : [ ]
+    "source" : "/*val toJson = stream.map(_._2)\n                    .map(Json.parse(_).as[MovieRaw])*/\n\nstream.foreachRDD { rdd =>\n  \n  if (rdd.isEmpty()) {\n    ssc.stop()\n  } else {\n    println(rdd.count())\n  }\n  \n  rdd.map(x => x.toString())\n    .map(Json.parse(_).as[MovieRaw])\n  /*.foreachPartition(partition => {\n      \n      \n      \n  })*/\n\n  \n  //rdd.&foreach(x => println(x.original_title))\n  /*rdd.map(movie => (movie.original_language, movie))\n                        .groupByKey()\n                        .collect()*/\n\n  \n}\n\n//stream.count().print()\n\n/*val byLanguages = toJson.map(movie => (movie.original_language, movie))\n                        .groupByKey()\n                        .collect()*/\n\nssc.start()\nssc.awaitTermination()",
+    "outputs" : [ {
+      "name" : "stdout",
+      "output_type" : "stream",
+      "text" : "7021\n"
+    }, {
+      "metadata" : { },
+      "data" : {
+        "text/html" : ""
+      },
+      "output_type" : "execute_result",
+      "execution_count" : 28,
+      "time" : "Took: 20 seconds 556 milliseconds, at 2017-7-8 20:45"
+    } ]
   }, {
     "metadata" : {
       "trusted" : true,
       "input_collapsed" : false,
-      "collapsed" : true,
+      "collapsed" : false,
       "id" : "BEDB5F3F83E64A84B53AC4D978A06239"
     },
     "cell_type" : "code",
-    "source" : "",
-    "outputs" : [ ]
+    "source" : "ssc.stop()",
+    "outputs" : [ {
+      "metadata" : { },
+      "data" : {
+        "text/html" : ""
+      },
+      "output_type" : "execute_result",
+      "execution_count" : 26,
+      "time" : "Took: 3 seconds 758 milliseconds, at 2017-7-8 20:44"
+    } ]
   }, {
     "metadata" : {
       "trusted" : true,
