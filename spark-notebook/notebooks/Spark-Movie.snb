@@ -1,0 +1,139 @@
+{
+  "metadata" : {
+    "name" : "Visualization",
+    "user_save_timestamp" : "1970-01-01T01:00:00.000Z",
+    "auto_save_timestamp" : "1970-01-01T01:00:00.000Z",
+    "language_info" : {
+      "name" : "scala",
+      "file_extension" : "scala",
+      "codemirror_mode" : "text/x-scala"
+    },
+    "trusted" : true,
+    "customLocalRepo" : null,
+    "customRepos" : null,
+    "customDeps" : [ "org.apache.kafka %% kafka % 0.8.2.1", "org.apache.kafka % kafka-clients % 0.11.0.0", "org.apache.spark %% spark-core % 2.1.1", "org.apache.spark %% spark-streaming % 2.1.1", "org.apache.spark %% spark-streaming-kafka-0-8 % 2.1.1", "com.typesafe.play %% play-json % 2.4.0" ],
+    "customImports" : null,
+    "customArgs" : null,
+    "customSparkConf" : null
+  },
+  "cells" : [ {
+    "metadata" : {
+      "trusted" : true,
+      "input_collapsed" : false,
+      "collapsed" : false,
+      "id" : "002FD47C8387498C8898D38143240A59"
+    },
+    "cell_type" : "code",
+    "source" : "import org.apache.spark.SparkConf\nimport org.apache.spark.streaming.kafka.KafkaUtils\nimport org.apache.spark.streaming.{Seconds, StreamingContext}\nimport kafka.serializer.StringDecoder\n//import play.api.libs.json._\nimport play.api.libs.json.Json",
+    "outputs" : [ {
+      "name" : "stdout",
+      "output_type" : "stream",
+      "text" : "import org.apache.spark.SparkConf\nimport org.apache.spark.streaming.kafka.KafkaUtils\nimport org.apache.spark.streaming.{Seconds, StreamingContext}\nimport kafka.serializer.StringDecoder\nimport play.api.libs.json.Json\n"
+    }, {
+      "metadata" : { },
+      "data" : {
+        "text/html" : ""
+      },
+      "output_type" : "execute_result",
+      "execution_count" : 1,
+      "time" : "Took: 4 seconds 386 milliseconds, at 2017-7-8 17:47"
+    } ]
+  }, {
+    "metadata" : {
+      "trusted" : true,
+      "input_collapsed" : false,
+      "collapsed" : false,
+      "id" : "C21023AFFE0742FE86B341B55DD91620"
+    },
+    "cell_type" : "code",
+    "source" : "  case class Review (\n    author : String,\n    id : String,\n    url : String,\n    content : String,\n    analysis : Int\n  )\n  object Review {\n    implicit val reviewFormat = play.api.libs.json.Json.format[Review]\n  }\n\n  case class MovieRaw (\n    id : Int,\n    original_title : String,\n    title : String,\n    overview : String,\n    original_language : String,\n    release_date : String,\n    popularity : Double,\n    review_popularity : Double,\n    vote_average : Double,\n    vote_count : Int,\n    reviews : List[Review],\n    genre_ids : List[Int],\n    video : Boolean\n  )\n  object MovieRaw {\n    implicit val movieFormat = play.api.libs.json.Json.format[MovieRaw]\n  }",
+    "outputs" : [ {
+      "name" : "stdout",
+      "output_type" : "stream",
+      "text" : "defined class Review\ndefined object Review\ndefined class MovieRaw\ndefined object MovieRaw\n"
+    }, {
+      "metadata" : { },
+      "data" : {
+        "text/html" : ""
+      },
+      "output_type" : "execute_result",
+      "execution_count" : 2,
+      "time" : "Took: 5 seconds 906 milliseconds, at 2017-7-8 17:48"
+    } ]
+  }, {
+    "metadata" : {
+      "trusted" : true,
+      "input_collapsed" : false,
+      "collapsed" : false,
+      "id" : "DE19DEC975324279B14C1782821840C8"
+    },
+    "cell_type" : "code",
+    "source" : "val brokers = \"localhost:9092\"\nval topic = \"movie-analyzed\"",
+    "outputs" : [ {
+      "name" : "stdout",
+      "output_type" : "stream",
+      "text" : "brokers: String = localhost:9092\ntopic: String = movie-analyzed\n"
+    }, {
+      "metadata" : { },
+      "data" : {
+        "text/html" : ""
+      },
+      "output_type" : "execute_result",
+      "execution_count" : 3,
+      "time" : "Took: 3 seconds 424 milliseconds, at 2017-7-8 17:48"
+    } ]
+  }, {
+    "metadata" : {
+      "trusted" : true,
+      "input_collapsed" : false,
+      "collapsed" : false,
+      "id" : "9FB2D49218394BE1B4B9D52E777F3976"
+    },
+    "cell_type" : "code",
+    "source" : "val ssc = StreamingContext.getActiveOrCreate(() => new StreamingContext(sc, Seconds(1)))\n\nval kafkaParams = Map[String, String](\"bootstrap.servers\" -> brokers)\nval stream = KafkaUtils.createDirectStream[String, String, StringDecoder, StringDecoder](\n      ssc, kafkaParams, Set(topic)\n)",
+    "outputs" : [ {
+      "name" : "stdout",
+      "output_type" : "stream",
+      "text" : "ssc: org.apache.spark.streaming.StreamingContext = org.apache.spark.streaming.StreamingContext@2898c4b3\nkafkaParams: scala.collection.immutable.Map[String,String] = Map(bootstrap.servers -> localhost:9092)\nstream: org.apache.spark.streaming.dstream.InputDStream[(String, String)] = org.apache.spark.streaming.kafka.DirectKafkaInputDStream@58a4fb18\n"
+    }, {
+      "metadata" : { },
+      "data" : {
+        "text/html" : ""
+      },
+      "output_type" : "execute_result",
+      "execution_count" : 4,
+      "time" : "Took: 5 seconds 791 milliseconds, at 2017-7-8 17:48"
+    } ]
+  }, {
+    "metadata" : {
+      "trusted" : true,
+      "input_collapsed" : false,
+      "collapsed" : false,
+      "id" : "3E67AA5A8C664319883A11CA7E2C62B2"
+    },
+    "cell_type" : "code",
+    "source" : "val toJson = stream.map(_._2)\n                    .map(Json.parse(_).as[MovieRaw])\n\ntoJson.foreachRDD { rdd =>\n  rdd.foreach(x => println(x.original_title))\n  \n  /*rdd.map(movie => (movie.original_language, movie))\n                        .groupByKey()\n                        .collect()*/\n}\n\n/*val byLanguages = toJson.map(movie => (movie.original_language, movie))\n                        .groupByKey()\n                        .collect()*/\n\nssc.start()\nssc.awaitTermination()",
+    "outputs" : [ ]
+  }, {
+    "metadata" : {
+      "trusted" : true,
+      "input_collapsed" : false,
+      "collapsed" : true,
+      "id" : "BEDB5F3F83E64A84B53AC4D978A06239"
+    },
+    "cell_type" : "code",
+    "source" : "",
+    "outputs" : [ ]
+  }, {
+    "metadata" : {
+      "trusted" : true,
+      "input_collapsed" : false,
+      "collapsed" : true,
+      "id" : "A43A25061F65407C869F2BA24BC27451"
+    },
+    "cell_type" : "code",
+    "source" : "",
+    "outputs" : [ ]
+  } ],
+  "nbformat" : 4
+}
