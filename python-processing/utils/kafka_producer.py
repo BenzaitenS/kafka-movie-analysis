@@ -6,7 +6,7 @@ class KafkaProducerWrapper:
 
     def produce(self, data, topic):
         try:
-            self._producer.send(topic, data.encode('utf-8'))
+            self._producer.send(topic, data.encode('ascii'))
         except Exception as e:
             print(e)
 

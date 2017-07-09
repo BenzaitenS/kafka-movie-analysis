@@ -37,7 +37,8 @@ def parse_args():
 def stream_file(file_path, kafka_handler, topic):
     with open(file_path, "r") as f:
         for line in f:
-            kafka_handler.produce(line, topic)
+            data = json.loads(line)
+            kafka_handler.produce(json.dumps(data), topic)
         kafka_handler.flush()
 
 def stream_from_api(kafka_handler, topic):

@@ -82,10 +82,12 @@ object SparkConsumer {
                     val producer = SparkKafkaUtils.createProducer(options.get("brokers").get)
 
                     partition.foreach {
+
                         case movieStr : String => {
                             val message = new ProducerRecord[String, String](options.get("produce").get, null, movieStr)
                             producer.send(message)
                         }
+
                     }
 
                     producer.flush()

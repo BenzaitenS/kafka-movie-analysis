@@ -98,28 +98,10 @@ finish() {
     sleep 5
     sh $ZOO_STOP_SCRIPT
 
-    # Kills python scripts
-    kill "$python_fetcher_pid"
-
     # Stops the notebook
     sudo docker stop docker-notebook
 }
 
 trap finish SIGINT SIGTERM EXIT
-
-# ###########################
-# #       RUNS FETCHER      #
-# ###########################
-# if [ -z "$FETCH_FROM_API_ARG" ]; then
-#     python3 ./python-processing/fetcher.py
-# else
-#     python3 ./python-processing/fetcher.py -i "$FETCH_FROM_API_ARG"
-# fi
-# python_fetcher_pid="$!"
-
-# ###########################
-# #      RUNS NOTEBOOK      #
-# ###########################
-# sudo docker start docker-notebook
 
 wait "$kafka_server_pid"

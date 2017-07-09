@@ -47,8 +47,8 @@
         "text/html" : ""
       },
       "output_type" : "execute_result",
-      "execution_count" : 9,
-      "time" : "Took: 2 seconds 155 milliseconds, at 2017-7-9 16:52"
+      "execution_count" : 1,
+      "time" : "Took: 5 seconds 465 milliseconds, at 2017-7-9 19:11"
     } ]
   }, {
     "metadata" : {
@@ -75,8 +75,8 @@
         "text/html" : ""
       },
       "output_type" : "execute_result",
-      "execution_count" : 10,
-      "time" : "Took: 3 seconds 759 milliseconds, at 2017-7-9 16:52"
+      "execution_count" : 2,
+      "time" : "Took: 7 seconds 928 milliseconds, at 2017-7-9 19:11"
     } ]
   }, {
     "metadata" : {
@@ -93,8 +93,8 @@
         "text/html" : ""
       },
       "output_type" : "execute_result",
-      "execution_count" : 11,
-      "time" : "Took: 3 seconds 350 milliseconds, at 2017-7-9 16:52"
+      "execution_count" : 3,
+      "time" : "Took: 6 seconds 818 milliseconds, at 2017-7-9 19:11"
     } ]
   }, {
     "metadata" : {
@@ -111,8 +111,8 @@
         "text/html" : ""
       },
       "output_type" : "execute_result",
-      "execution_count" : 12,
-      "time" : "Took: 3 seconds 287 milliseconds, at 2017-7-9 16:52"
+      "execution_count" : 4,
+      "time" : "Took: 5 seconds 258 milliseconds, at 2017-7-9 19:11"
     } ]
   }, {
     "metadata" : {
@@ -139,8 +139,8 @@
         "text/html" : ""
       },
       "output_type" : "execute_result",
-      "execution_count" : 13,
-      "time" : "Took: 2 seconds 209 milliseconds, at 2017-7-9 16:52"
+      "execution_count" : 5,
+      "time" : "Took: 3 seconds 342 milliseconds, at 2017-7-9 19:11"
     } ]
   }, {
     "metadata" : {
@@ -150,19 +150,19 @@
       "id" : "9FB2D49218394BE1B4B9D52E777F3976"
     },
     "cell_type" : "code",
-    "source" : "@transient val ssc = StreamingContext.getActiveOrCreate(() => new StreamingContext(sc, Seconds(10)))\n\n//val kafkaParams = Map[String, String](\"bootstrap.servers\" -> brokers)\nval kafkaParams = Map[String, String] (\n  \"bootstrap.servers\" -> brokers,\n  \"group.id\" -> \"my-group\",\n  \"auto.offset.reset\" -> \"smallest\",\n  \"enable.auto.commit\" -> \"false\"\n)\n\nval stream = KafkaUtils.createDirectStream[String, String, StringDecoder, StringDecoder](ssc, kafkaParams, Set(topic))",
+    "source" : "@transient val ssc = StreamingContext.getActiveOrCreate(() => new StreamingContext(sc, Seconds(10)))\n\n//val kafkaParams = Map[String, String](\"bootstrap.servers\" -> brokers)\nval kafkaParams = Map[String, String] (\n  \"bootstrap.servers\" -> brokers,\n  \"group.id\" -> \"test\",\n  \"auto.offset.reset\" -> \"smallest\"\n)\n\nval stream = KafkaUtils.createDirectStream[String, String, StringDecoder, StringDecoder](ssc, kafkaParams, Set(topic))",
     "outputs" : [ {
       "name" : "stdout",
       "output_type" : "stream",
-      "text" : "ssc: org.apache.spark.streaming.StreamingContext = org.apache.spark.streaming.StreamingContext@57ad992f\nkafkaParams: scala.collection.immutable.Map[String,String] = Map(bootstrap.servers -> localhost:9092, group.id -> my-group, auto.offset.reset -> smallest, enable.auto.commit -> false)\nstream: org.apache.spark.streaming.dstream.InputDStream[(String, String)] = org.apache.spark.streaming.kafka.DirectKafkaInputDStream@47d1ec58\n"
+      "text" : "ssc: org.apache.spark.streaming.StreamingContext = org.apache.spark.streaming.StreamingContext@25192c4a\nkafkaParams: scala.collection.immutable.Map[String,String] = Map(bootstrap.servers -> localhost:9092, group.id -> test, auto.offset.reset -> smallest)\nstream: org.apache.spark.streaming.dstream.InputDStream[(String, String)] = org.apache.spark.streaming.kafka.DirectKafkaInputDStream@35d1038\n"
     }, {
       "metadata" : { },
       "data" : {
         "text/html" : ""
       },
       "output_type" : "execute_result",
-      "execution_count" : 14,
-      "time" : "Took: 2 seconds 357 milliseconds, at 2017-7-9 16:53"
+      "execution_count" : 8,
+      "time" : "Took: 5 seconds 397 milliseconds, at 2017-7-9 19:12"
     } ]
   }, {
     "metadata" : {
@@ -195,8 +195,8 @@
         "text/html" : ""
       },
       "output_type" : "execute_result",
-      "execution_count" : 15,
-      "time" : "Took: 1 second 973 milliseconds, at 2017-7-9 16:53"
+      "execution_count" : 9,
+      "time" : "Took: 3 seconds 829 milliseconds, at 2017-7-9 19:12"
     } ]
   }, {
     "metadata" : {
@@ -206,11 +206,11 @@
       "id" : "3E67AA5A8C664319883A11CA7E2C62B2"
     },
     "cell_type" : "code",
-    "source" : "//val toJson = stream.map(_._2).map(Json.parse(_).as[MovieRaw.MovieRaw]).print()\nstream.map(_._2).foreachRDD { rdd => {\n  if (rdd.isEmpty()) {\n    println(\"empty :(\")\n    ssc.stop()\n  }\n  else {\n    //rdd.map(x => x._2)\n    rdd.flatMap(x => {\n      try {\n        print(x)\n        stringToMovie(x)\n      } catch {\n        case e: Exception => {print(\"x\"); None}\n      }\n    }).count()\n    //.groupBy(x => x.original_language)\n    //.map(x => (x._1, x._2.size))\n    //.collect()\n    //.foreach(x => addToMap(x._1, x._2, byYearMovie))\n  }\n  }\n}\n\nssc.start()\nssc.awaitTermination()",
+    "source" : "//val toJson = stream.map(_._2).map(Json.parse(_).as[MovieRaw.MovieRaw]).print()\nstream.map(_._2).foreachRDD { rdd => {\n  if (rdd.isEmpty()) {\n    println(\"empty :(\")\n    ssc.stop()\n  }\n  else {\n    //rdd.map(x => x._2)\n    rdd.flatMap(x => {\n      try {\n        print(x)\n        stringToMovie(x)\n      } catch {\n        case e: Exception => {print(\"NOT OK\"); None}\n      }\n    }).count()\n    //.groupBy(x => x.original_language)\n    //.map(x => (x._1, x._2.size))\n    //.collect()\n    //.foreach(x => addToMap(x._1, x._2, byYearMovie))\n  }\n  }\n}\n\nssc.start()\nssc.awaitTermination()",
     "outputs" : [ {
       "name" : "stdout",
       "output_type" : "stream",
-      "text" : "java.lang.IllegalStateException: Adding new inputs, transformations, and output operations after stopping a context is not supported\n  at org.apache.spark.streaming.dstream.DStream.validateAtInit(DStream.scala:227)\n  at org.apache.spark.streaming.dstream.DStream.<init>(DStream.scala:65)\n  at org.apache.spark.streaming.dstream.MappedDStream.<init>(MappedDStream.scala:29)\n  at org.apache.spark.streaming.dstream.DStream$$anonfun$map$1.apply(DStream.scala:546)\n  at org.apache.spark.streaming.dstream.DStream$$anonfun$map$1.apply(DStream.scala:546)\n  at org.apache.spark.rdd.RDDOperationScope$.withScope(RDDOperationScope.scala:151)\n  at org.apache.spark.rdd.RDDOperationScope$.withScope(RDDOperationScope.scala:112)\n  at org.apache.spark.SparkContext.withScope(SparkContext.scala:701)\n  at org.apache.spark.streaming.StreamingContext.withScope(StreamingContext.scala:264)\n  at org.apache.spark.streaming.dstream.DStream.map(DStream.scala:545)\n  ... 79 elided\n"
+      "text" : "org.apache.spark.SparkException: Task not serializable\n  at org.apache.spark.util.ClosureCleaner$.ensureSerializable(ClosureCleaner.scala:298)\n  at org.apache.spark.util.ClosureCleaner$.org$apache$spark$util$ClosureCleaner$$clean(ClosureCleaner.scala:288)\n  at org.apache.spark.util.ClosureCleaner$.clean(ClosureCleaner.scala:108)\n  at org.apache.spark.SparkContext.clean(SparkContext.scala:2101)\n  at org.apache.spark.rdd.RDD$$anonfun$flatMap$1.apply(RDD.scala:379)\n  at org.apache.spark.rdd.RDD$$anonfun$flatMap$1.apply(RDD.scala:378)\n  at org.apache.spark.rdd.RDDOperationScope$.withScope(RDDOperationScope.scala:151)\n  at org.apache.spark.rdd.RDDOperationScope$.withScope(RDDOperationScope.scala:112)\n  at org.apache.spark.rdd.RDD.withScope(RDD.scala:362)\n  at org.apache.spark.rdd.RDD.flatMap(RDD.scala:378)\n  at $anonfun$2.apply(<console>:106)\n  at $anonfun$2.apply(<console>:99)\n  at org.apache.spark.streaming.dstream.DStream$$anonfun$foreachRDD$1$$anonfun$apply$mcV$sp$3.apply(DStream.scala:627)\n  at org.apache.spark.streaming.dstream.DStream$$anonfun$foreachRDD$1$$anonfun$apply$mcV$sp$3.apply(DStream.scala:627)\n  at org.apache.spark.streaming.dstream.ForEachDStream$$anonfun$1$$anonfun$apply$mcV$sp$1.apply$mcV$sp(ForEachDStream.scala:51)\n  at org.apache.spark.streaming.dstream.ForEachDStream$$anonfun$1$$anonfun$apply$mcV$sp$1.apply(ForEachDStream.scala:51)\n  at org.apache.spark.streaming.dstream.ForEachDStream$$anonfun$1$$anonfun$apply$mcV$sp$1.apply(ForEachDStream.scala:51)\n  at org.apache.spark.streaming.dstream.DStream.createRDDWithLocalProperties(DStream.scala:415)\n  at org.apache.spark.streaming.dstream.ForEachDStream$$anonfun$1.apply$mcV$sp(ForEachDStream.scala:50)\n  at org.apache.spark.streaming.dstream.ForEachDStream$$anonfun$1.apply(ForEachDStream.scala:50)\n  at org.apache.spark.streaming.dstream.ForEachDStream$$anonfun$1.apply(ForEachDStream.scala:50)\n  at scala.util.Try$.apply(Try.scala:192)\n  at org.apache.spark.streaming.scheduler.Job.run(Job.scala:39)\n  at org.apache.spark.streaming.scheduler.JobScheduler$JobHandler$$anonfun$run$1.apply$mcV$sp(JobScheduler.scala:256)\n  at org.apache.spark.streaming.scheduler.JobScheduler$JobHandler$$anonfun$run$1.apply(JobScheduler.scala:256)\n  at org.apache.spark.streaming.scheduler.JobScheduler$JobHandler$$anonfun$run$1.apply(JobScheduler.scala:256)\n  at scala.util.DynamicVariable.withValue(DynamicVariable.scala:58)\n  at org.apache.spark.streaming.scheduler.JobScheduler$JobHandler.run(JobScheduler.scala:255)\n  at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1142)\n  at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:617)\n  at java.lang.Thread.run(Thread.java:748)\nCaused by: java.io.NotSerializableException: Object of org.apache.spark.streaming.kafka.DirectKafkaInputDStream is being serialized  possibly as a part of closure of an RDD operation. This is because  the DStream object is being referred to from within the closure.  Please rewrite the RDD operation inside this DStream to avoid this.  This has been enforced to avoid bloating of Spark tasks  with unnecessary objects.\nSerialization stack:\n\n  at org.apache.spark.serializer.SerializationDebugger$.improveException(SerializationDebugger.scala:40)\n  at org.apache.spark.serializer.JavaSerializationStream.writeObject(JavaSerializer.scala:46)\n  at org.apache.spark.serializer.JavaSerializerInstance.serialize(JavaSerializer.scala:100)\n  at org.apache.spark.util.ClosureCleaner$.ensureSerializable(ClosureCleaner.scala:295)\n  ... 30 more\n"
     } ]
   }, {
     "metadata" : {
@@ -263,8 +263,8 @@
         "text/html" : ""
       },
       "output_type" : "execute_result",
-      "execution_count" : 19,
-      "time" : "Took: 2 seconds 817 milliseconds, at 2017-7-9 16:53"
+      "execution_count" : 9,
+      "time" : "Took: 5 seconds 402 milliseconds, at 2017-7-9 18:20"
     } ]
   }, {
     "metadata" : {
