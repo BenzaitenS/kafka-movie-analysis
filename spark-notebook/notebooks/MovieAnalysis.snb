@@ -1,0 +1,221 @@
+{
+  "metadata" : {
+    "name" : "Movies",
+    "user_save_timestamp" : "1970-01-01T01:00:00.000Z",
+    "auto_save_timestamp" : "1970-01-01T01:00:00.000Z",
+    "language_info" : {
+      "name" : "scala",
+      "file_extension" : "scala",
+      "codemirror_mode" : "text/x-scala"
+    },
+    "trusted" : true,
+    "customLocalRepo" : null,
+    "customRepos" : null,
+    "customDeps" : [ "org.apache.kafka %% kafka % 0.8.2.1", "org.apache.kafka % kafka-clients % 0.11.0.0", "org.apache.spark %% spark-core % 2.1.1", "org.apache.spark %% spark-streaming % 2.1.1", "org.apache.spark %% spark-streaming-kafka-0-8 % 2.1.1", "com.typesafe.play %% play-json % 2.4.0" ],
+    "customImports" : null,
+    "customArgs" : null,
+    "customSparkConf" : null
+  },
+  "cells" : [ {
+    "metadata" : {
+      "trusted" : true,
+      "input_collapsed" : false,
+      "collapsed" : false,
+      "id" : "002FD47C8387498C8898D38143240A59"
+    },
+    "cell_type" : "code",
+    "source" : "import org.apache.spark.SparkConf\nimport org.apache.spark.streaming.kafka.KafkaUtils\nimport org.apache.spark.streaming.{Seconds, StreamingContext}\nimport kafka.serializer.StringDecoder\nimport org.apache.kafka.common.serialization.StringDeserializer\n//import play.api.libs.json._\nimport play.api.libs.json.Json\nimport scala.collection.parallel.mutable.ParHashMap\n",
+    "outputs" : [ {
+      "name" : "stdout",
+      "output_type" : "stream",
+      "text" : "import org.apache.spark.SparkConf\nimport org.apache.spark.streaming.kafka.KafkaUtils\nimport org.apache.spark.streaming.{Seconds, StreamingContext}\nimport kafka.serializer.StringDecoder\nimport org.apache.kafka.common.serialization.StringDeserializer\nimport play.api.libs.json.Json\nimport scala.collection.parallel.mutable.ParHashMap\n"
+    }, {
+      "metadata" : { },
+      "data" : {
+        "text/html" : ""
+      },
+      "output_type" : "execute_result",
+      "execution_count" : 1,
+      "time" : "Took: 1 second 357 milliseconds, at 2017-7-9 20:22"
+    } ]
+  }, {
+    "metadata" : {
+      "trusted" : true,
+      "input_collapsed" : false,
+      "collapsed" : false,
+      "id" : "C21023AFFE0742FE86B341B55DD91620"
+    },
+    "cell_type" : "code",
+    "source" : "  case class Review (\n    author : String,\n    id : String,\n    url : String,\n    content : String,\n    analysis : Int\n  )\n  object Review {\n    @transient implicit val reviewFormat = play.api.libs.json.Json.format[Review]\n  }\n\n  case class MovieRaw (\n    id : Int,\n    original_title : String,\n    title : String,\n    overview : String,\n    original_language : String,\n    release_date : String,\n    popularity : Float,\n    review_popularity : Float,\n    vote_average : Float,\n    vote_count : Int,\n    reviews : List[Review],\n    genre_ids : List[Int],\n    video : Boolean\n  )\n  object MovieRaw {\n    @transient implicit val movieFormat = play.api.libs.json.Json.format[MovieRaw]\n  }\n\n\n/*object Review extends Serializable {\n  case class Review (\n    author : String,\n    id : String,\n    url : String,\n    content : String,\n    analysis : Int\n  ) extends Serializable \n  @transient implicit val Reads = Json.reads[Review]\n}\n\nobject MovieRaw extends Serializable  {\n  case class MovieRaw (\n    id : Int,\n    original_title : String,\n    title : String,\n    overview : String,\n    original_language : String,\n    release_date : String,\n    review_popularity : Float,\n    popularity : Float,\n    vote_average : Float,\n    vote_count : Int,\n    reviews : List[Review.Review],\n    genre_ids : List[Int],\n    video : Boolean\n  ) extends Serializable\n  @transient implicit val Reads = Json.reads[MovieRaw]\n}*/",
+    "outputs" : [ {
+      "name" : "stdout",
+      "output_type" : "stream",
+      "text" : "defined class Review\ndefined object Review\ndefined class MovieRaw\ndefined object MovieRaw\n"
+    }, {
+      "metadata" : { },
+      "data" : {
+        "text/html" : ""
+      },
+      "output_type" : "execute_result",
+      "execution_count" : 7,
+      "time" : "Took: 1 second 329 milliseconds, at 2017-7-9 20:22"
+    } ]
+  }, {
+    "metadata" : {
+      "trusted" : true,
+      "input_collapsed" : false,
+      "collapsed" : false,
+      "id" : "DE19DEC975324279B14C1782821840C8"
+    },
+    "cell_type" : "code",
+    "source" : "val brokers = \"192.168.43.74\" + \":9092\"\nval topic = \"movie-analyzed\"",
+    "outputs" : [ {
+      "name" : "stdout",
+      "output_type" : "stream",
+      "text" : "brokers: String = 192.168.43.74:9092\ntopic: String = movie-analyzed\n"
+    }, {
+      "metadata" : { },
+      "data" : {
+        "text/html" : ""
+      },
+      "output_type" : "execute_result",
+      "execution_count" : 8,
+      "time" : "Took: 981 milliseconds, at 2017-7-9 20:22"
+    } ]
+  }, {
+    "metadata" : {
+      "trusted" : true,
+      "input_collapsed" : false,
+      "collapsed" : false,
+      "id" : "9FB2D49218394BE1B4B9D52E777F3976"
+    },
+    "cell_type" : "code",
+    "source" : "@transient\nval ssc = StreamingContext.getActiveOrCreate(() =>\n            new StreamingContext(sc, Seconds(10)))\n//ssc.checkpoint(\"/tmp/checmovie\")\n\n//val kafkaParams = Map[String, String](\"bootstrap.servers\" -> brokers)\nval kafkaParams = Map[String, String] (\n  \"bootstrap.servers\" -> brokers,\n  \"group.id\" -> \"my-group\",\n  \"auto.offset.reset\" -> \"smallest\",\n  \"enable.auto.commit\" -> \"false\"\n)\n\nval stream = KafkaUtils.createDirectStream[String, String, StringDecoder,\n                                           StringDecoder](\n      ssc, kafkaParams, Set(topic)\n)",
+    "outputs" : [ {
+      "name" : "stdout",
+      "output_type" : "stream",
+      "text" : "ssc: org.apache.spark.streaming.StreamingContext = org.apache.spark.streaming.StreamingContext@6bdcaf66\nkafkaParams: scala.collection.immutable.Map[String,String] = Map(bootstrap.servers -> 192.168.43.74:9092, group.id -> my-group, auto.offset.reset -> smallest, enable.auto.commit -> false)\nstream: org.apache.spark.streaming.dstream.InputDStream[(String, String)] = org.apache.spark.streaming.kafka.DirectKafkaInputDStream@2e459f27\n"
+    }, {
+      "metadata" : { },
+      "data" : {
+        "text/html" : ""
+      },
+      "output_type" : "execute_result",
+      "execution_count" : 9,
+      "time" : "Took: 1 second 270 milliseconds, at 2017-7-9 20:22"
+    } ]
+  }, {
+    "metadata" : {
+      "trusted" : true,
+      "input_collapsed" : false,
+      "collapsed" : false,
+      "id" : "A7B50D9FEE704F2B8DBD94CE1CC461AD"
+    },
+    "cell_type" : "code",
+    "source" : "var mySet = new ParHashMap[String, Int]()\n\ndef addToMap(myMap: ParHashMap[String, Int], key: String, v: Int) = {\n  myMap.put(key, myMap.getOrElse(key, 0) + v)\n}",
+    "outputs" : [ {
+      "name" : "stdout",
+      "output_type" : "stream",
+      "text" : "mySet: scala.collection.parallel.mutable.ParHashMap[String,Int] = ParHashMap()\naddToMap: (myMap: scala.collection.parallel.mutable.ParHashMap[String,Int], key: String, v: Int)Option[Int]\n"
+    }, {
+      "metadata" : { },
+      "data" : {
+        "text/html" : ""
+      },
+      "output_type" : "execute_result",
+      "execution_count" : 10,
+      "time" : "Took: 893 milliseconds, at 2017-7-9 20:22"
+    } ]
+  }, {
+    "metadata" : {
+      "trusted" : true,
+      "input_collapsed" : false,
+      "collapsed" : false,
+      "id" : "F5E3EBD932CD4EC98AE4549E06D52CFA"
+    },
+    "cell_type" : "code",
+    "source" : "def stringToMovie(str: String) : Option[MovieRaw.MovieRaw] = {\n  try {\n    Some(Json.fromJson[MovieRaw.MovieRaw](Json.parse(str)).get)\n  } catch {\n    case e: Exception => {print(\"x1\"); None}\n  }\n}",
+    "outputs" : [ {
+      "name" : "stdout",
+      "output_type" : "stream",
+      "text" : "<console>:78: error: type MovieRaw is not a member of object MovieRaw\n       def stringToMovie(str: String) : Option[MovieRaw.MovieRaw] = {\n                                                        ^\n<console>:80: error: type MovieRaw is not a member of object MovieRaw\n           Some(Json.fromJson[MovieRaw.MovieRaw](Json.parse(str)).get)\n                                       ^\n"
+    } ]
+  }, {
+    "metadata" : {
+      "trusted" : true,
+      "input_collapsed" : false,
+      "collapsed" : false,
+      "id" : "3E67AA5A8C664319883A11CA7E2C62B2"
+    },
+    "cell_type" : "code",
+    "source" : "/*val toJson = stream.map(_._2)\n                    .map(Json.parse(_).as[MovieRaw])\n*/\n\n/*\nstream.foreachRDD { rdd =>\n  \n  if (rdd.isEmpty()) {\n    ssc.stop()\n  } else {\n    println(rdd.count())\n  }\n  \n  rdd.map(x => x.toString())\n    .map(Json.parse(_).as[MovieRaw])\n  .foreachPartition(partition => {\n      \n      \n      \n  })\n*/\n\nstream\n  .map(_._2)\n  .map(Json.parse(_).as[MovieRaw])\n  .foreachRDD{ rdd =>\n      if (rdd.isEmpty()) {\n        println(\"empty :(\")\n        ssc.stop()\n        }\n  else {\n    rdd\n      .map(x => (x.original_language, 1))\n      .reduceByKey(_ + _)\n      .collect()\n      .foreach(x => addToMap(mySet, x._1, x._2))\n  }\n  }\n\n\n  //rdd.&foreach(x => println(x.original_title))\n  /*rdd.map(movie => (movie.original_language, movie))\n                        .groupByKey()\n                        .collect()*/\n\n//stream.count().print()\n\n/*val byLanguages = toJson.map(movie => (movie.original_language, movie))\n                        .groupByKey()\n                        .collect()*/\n/*\nstream.map(_._2).foreachRDD { rdd => {\n  if (rdd.isEmpty()) {\n    println(\"empty :(\")\n    ssc.stop()\n  }\n  else {\n    //rdd.map(x => x._2)\n    rdd.flatMap(x => {\n      try {\n        print(x)\n        stringToMovie(x)\n      } catch {\n        case e: Exception => {print(\"NOT OK\"); None}\n      }\n    }).collect()\n    //.groupBy(x => x.original_language)\n    //.map(x => (x._1, x._2.size))\n    //.collect()\n    //.foreach(x => addToMap(x._1, x._2, byYearMovie))\n  }\n  }\n}\n*/\nssc.start()\nssc.awaitTermination()",
+    "outputs" : [ {
+      "name" : "stdout",
+      "output_type" : "stream",
+      "text" : "empty :(\n"
+    }, {
+      "metadata" : { },
+      "data" : {
+        "text/html" : ""
+      },
+      "output_type" : "execute_result",
+      "execution_count" : 12,
+      "time" : "Took: 30 seconds 687 milliseconds, at 2017-7-9 20:23"
+    } ]
+  }, {
+    "metadata" : {
+      "trusted" : true,
+      "input_collapsed" : false,
+      "collapsed" : false,
+      "id" : "BEDB5F3F83E64A84B53AC4D978A06239"
+    },
+    "cell_type" : "code",
+    "source" : "ssc.stop()",
+    "outputs" : [ {
+      "metadata" : { },
+      "data" : {
+        "text/html" : ""
+      },
+      "output_type" : "execute_result",
+      "execution_count" : 13,
+      "time" : "Took: 1 second 10 milliseconds, at 2017-7-9 20:19"
+    } ]
+  }, {
+    "metadata" : {
+      "trusted" : true,
+      "input_collapsed" : false,
+      "collapsed" : false,
+      "presentation" : {
+        "tabs_state" : "{\n  \"tab_id\": \"#tab1709966776-2\"\n}",
+        "pivot_chart_state" : "{\n  \"hiddenAttributes\": [],\n  \"menuLimit\": 200,\n  \"cols\": [],\n  \"rows\": [],\n  \"vals\": [],\n  \"exclusions\": {},\n  \"inclusions\": {},\n  \"unusedAttrsVertical\": 85,\n  \"autoSortUnusedAttrs\": false,\n  \"inclusionsInfo\": {},\n  \"aggregatorName\": \"Count\",\n  \"rendererName\": \"Table\"\n}"
+      },
+      "id" : "A43A25061F65407C869F2BA24BC27451"
+    },
+    "cell_type" : "code",
+    "source" : "mySet.toArray",
+    "outputs" : [ {
+      "name" : "stdout",
+      "output_type" : "stream",
+      "text" : "res14: Array[(String, Int)] = Array((kn,1), (id,7), (ur,3), (ru,20), (ml,17), (mr,3), (cn,31), (da,36), (nb,3), (sr,11), (hi,27), (el,2), (pl,2), (it,126), (hu,8), (th,7), (bs,4), (ja,163), (nl,12), (ko,49), (ab,1), (te,7), (lt,1), (es,101), (ku,2), (de,61), (no,12), (ms,1), (zh,27), (fi,9), (fr,193), (tl,5), (uz,2), (ar,5), (sv,40), (tr,5), (en,5725), (fa,13), (uk,3), (ca,5), (pt,19), (bn,5), (et,1), (cs,1), (gu,2), (he,5), (ta,219), (is,12), (ro,6))\n"
+    }, {
+      "metadata" : { },
+      "data" : {
+        "text/html" : "<div>\n      <script data-this=\"{&quot;dataId&quot;:&quot;anon5e943e0d390c0b5cb3fe1c88ecec8a50&quot;,&quot;dataInit&quot;:[],&quot;genId&quot;:&quot;1709966776&quot;}\" type=\"text/x-scoped-javascript\">/*<![CDATA[*/req(['../javascripts/notebook/playground','../javascripts/notebook/magic/tabs'], \n      function(playground, _magictabs) {\n        // data ==> data-this (in observable.js's scopedEval) ==> this in JS => { dataId, dataInit, ... }\n        // this ==> scope (in observable.js's scopedEval) ==> this.parentElement ==> div.container below (toHtml)\n\n        playground.call(data,\n                        this\n                        ,\n                        {\n    \"f\": _magictabs,\n    \"o\": {}\n  }\n  \n                        \n                        \n                      );\n      }\n    );/*]]>*/</script>\n    <div>\n      <div>\n        <ul class=\"nav nav-tabs\" id=\"ul1709966776\"><li>\n              <a href=\"#tab1709966776-0\"><i class=\"fa fa-table\"/></a>\n            </li><li>\n              <a href=\"#tab1709966776-1\"><i class=\"fa fa-bar-chart\"/></a>\n            </li><li>\n              <a href=\"#tab1709966776-2\"><i class=\"fa fa-pie-chart\"/></a>\n            </li><li>\n              <a href=\"#tab1709966776-3\"><i class=\"fa fa-cubes\"/></a>\n            </li></ul>\n\n        <div class=\"tab-content\" id=\"tab1709966776\"><div class=\"tab-pane\" id=\"tab1709966776-0\">\n            <div>\n      <script data-this=\"{&quot;dataId&quot;:&quot;anon9d995bfb4878afa97e387654f5384f4d&quot;,&quot;dataInit&quot;:[{&quot;_1&quot;:&quot;kn&quot;,&quot;_2&quot;:1},{&quot;_1&quot;:&quot;id&quot;,&quot;_2&quot;:7},{&quot;_1&quot;:&quot;ur&quot;,&quot;_2&quot;:3},{&quot;_1&quot;:&quot;ru&quot;,&quot;_2&quot;:20},{&quot;_1&quot;:&quot;ml&quot;,&quot;_2&quot;:17},{&quot;_1&quot;:&quot;mr&quot;,&quot;_2&quot;:3},{&quot;_1&quot;:&quot;cn&quot;,&quot;_2&quot;:31},{&quot;_1&quot;:&quot;da&quot;,&quot;_2&quot;:36},{&quot;_1&quot;:&quot;nb&quot;,&quot;_2&quot;:3},{&quot;_1&quot;:&quot;sr&quot;,&quot;_2&quot;:11},{&quot;_1&quot;:&quot;hi&quot;,&quot;_2&quot;:27},{&quot;_1&quot;:&quot;el&quot;,&quot;_2&quot;:2},{&quot;_1&quot;:&quot;pl&quot;,&quot;_2&quot;:2},{&quot;_1&quot;:&quot;it&quot;,&quot;_2&quot;:126},{&quot;_1&quot;:&quot;hu&quot;,&quot;_2&quot;:8},{&quot;_1&quot;:&quot;th&quot;,&quot;_2&quot;:7},{&quot;_1&quot;:&quot;bs&quot;,&quot;_2&quot;:4},{&quot;_1&quot;:&quot;ja&quot;,&quot;_2&quot;:163},{&quot;_1&quot;:&quot;nl&quot;,&quot;_2&quot;:12},{&quot;_1&quot;:&quot;ko&quot;,&quot;_2&quot;:49},{&quot;_1&quot;:&quot;ab&quot;,&quot;_2&quot;:1},{&quot;_1&quot;:&quot;te&quot;,&quot;_2&quot;:7},{&quot;_1&quot;:&quot;lt&quot;,&quot;_2&quot;:1},{&quot;_1&quot;:&quot;es&quot;,&quot;_2&quot;:101},{&quot;_1&quot;:&quot;ku&quot;,&quot;_2&quot;:2},{&quot;_1&quot;:&quot;de&quot;,&quot;_2&quot;:61},{&quot;_1&quot;:&quot;no&quot;,&quot;_2&quot;:12},{&quot;_1&quot;:&quot;ms&quot;,&quot;_2&quot;:1},{&quot;_1&quot;:&quot;zh&quot;,&quot;_2&quot;:27},{&quot;_1&quot;:&quot;fi&quot;,&quot;_2&quot;:9},{&quot;_1&quot;:&quot;fr&quot;,&quot;_2&quot;:193},{&quot;_1&quot;:&quot;tl&quot;,&quot;_2&quot;:5},{&quot;_1&quot;:&quot;uz&quot;,&quot;_2&quot;:2},{&quot;_1&quot;:&quot;ar&quot;,&quot;_2&quot;:5},{&quot;_1&quot;:&quot;sv&quot;,&quot;_2&quot;:40},{&quot;_1&quot;:&quot;tr&quot;,&quot;_2&quot;:5},{&quot;_1&quot;:&quot;en&quot;,&quot;_2&quot;:5725},{&quot;_1&quot;:&quot;fa&quot;,&quot;_2&quot;:13},{&quot;_1&quot;:&quot;uk&quot;,&quot;_2&quot;:3},{&quot;_1&quot;:&quot;ca&quot;,&quot;_2&quot;:5},{&quot;_1&quot;:&quot;pt&quot;,&quot;_2&quot;:19},{&quot;_1&quot;:&quot;bn&quot;,&quot;_2&quot;:5},{&quot;_1&quot;:&quot;et&quot;,&quot;_2&quot;:1},{&quot;_1&quot;:&quot;cs&quot;,&quot;_2&quot;:1},{&quot;_1&quot;:&quot;gu&quot;,&quot;_2&quot;:2},{&quot;_1&quot;:&quot;he&quot;,&quot;_2&quot;:5},{&quot;_1&quot;:&quot;ta&quot;,&quot;_2&quot;:219},{&quot;_1&quot;:&quot;is&quot;,&quot;_2&quot;:12},{&quot;_1&quot;:&quot;ro&quot;,&quot;_2&quot;:6}],&quot;genId&quot;:&quot;915110425&quot;}\" type=\"text/x-scoped-javascript\">/*<![CDATA[*/req(['../javascripts/notebook/playground','../javascripts/notebook/magic/tableChart'], \n      function(playground, _magictableChart) {\n        // data ==> data-this (in observable.js's scopedEval) ==> this in JS => { dataId, dataInit, ... }\n        // this ==> scope (in observable.js's scopedEval) ==> this.parentElement ==> div.container below (toHtml)\n\n        playground.call(data,\n                        this\n                        ,\n                        {\n    \"f\": _magictableChart,\n    \"o\": {\"headers\":[\"_1\",\"_2\"],\"width\":600,\"height\":400}\n  }\n  \n                        \n                        \n                      );\n      }\n    );/*]]>*/</script>\n    <div>\n      <span class=\"chart-total-item-count\"><p data-bind=\"text: value\"><script data-this=\"{&quot;valueId&quot;:&quot;anonff74346ce169e1eb669d6e5c516cba2f&quot;,&quot;initialValue&quot;:&quot;49&quot;}\" type=\"text/x-scoped-javascript\">/*<![CDATA[*/\nreq(\n['observable', 'knockout'],\nfunction (O, ko) {\n  ko.applyBindings({\n      value: O.makeObservable(valueId, initialValue)\n    },\n    this\n  );\n});\n        /*]]>*/</script></p> entries total</span>\n      <span class=\"chart-sampling-warning\"><p data-bind=\"text: value\"><script data-this=\"{&quot;valueId&quot;:&quot;anon4a529e0dc2ab110aa38bb9f594842ff6&quot;,&quot;initialValue&quot;:&quot;&quot;}\" type=\"text/x-scoped-javascript\">/*<![CDATA[*/\nreq(\n['observable', 'knockout'],\nfunction (O, ko) {\n  ko.applyBindings({\n      value: O.makeObservable(valueId, initialValue)\n    },\n    this\n  );\n});\n        /*]]>*/</script></p></span>\n      <div>\n      </div>\n    </div></div>\n            </div><div class=\"tab-pane\" id=\"tab1709966776-1\">\n            <div>\n      <script data-this=\"{&quot;dataId&quot;:&quot;anon3c7b51428bc42e491594f09a9ea4ff0a&quot;,&quot;dataInit&quot;:[{&quot;_1&quot;:&quot;kn&quot;,&quot;_2&quot;:1},{&quot;_1&quot;:&quot;id&quot;,&quot;_2&quot;:7},{&quot;_1&quot;:&quot;ur&quot;,&quot;_2&quot;:3},{&quot;_1&quot;:&quot;ru&quot;,&quot;_2&quot;:20},{&quot;_1&quot;:&quot;ml&quot;,&quot;_2&quot;:17},{&quot;_1&quot;:&quot;mr&quot;,&quot;_2&quot;:3},{&quot;_1&quot;:&quot;cn&quot;,&quot;_2&quot;:31},{&quot;_1&quot;:&quot;da&quot;,&quot;_2&quot;:36},{&quot;_1&quot;:&quot;nb&quot;,&quot;_2&quot;:3},{&quot;_1&quot;:&quot;sr&quot;,&quot;_2&quot;:11},{&quot;_1&quot;:&quot;hi&quot;,&quot;_2&quot;:27},{&quot;_1&quot;:&quot;el&quot;,&quot;_2&quot;:2},{&quot;_1&quot;:&quot;pl&quot;,&quot;_2&quot;:2},{&quot;_1&quot;:&quot;it&quot;,&quot;_2&quot;:126},{&quot;_1&quot;:&quot;hu&quot;,&quot;_2&quot;:8},{&quot;_1&quot;:&quot;th&quot;,&quot;_2&quot;:7},{&quot;_1&quot;:&quot;bs&quot;,&quot;_2&quot;:4},{&quot;_1&quot;:&quot;ja&quot;,&quot;_2&quot;:163},{&quot;_1&quot;:&quot;nl&quot;,&quot;_2&quot;:12},{&quot;_1&quot;:&quot;ko&quot;,&quot;_2&quot;:49},{&quot;_1&quot;:&quot;ab&quot;,&quot;_2&quot;:1},{&quot;_1&quot;:&quot;te&quot;,&quot;_2&quot;:7},{&quot;_1&quot;:&quot;lt&quot;,&quot;_2&quot;:1},{&quot;_1&quot;:&quot;es&quot;,&quot;_2&quot;:101},{&quot;_1&quot;:&quot;ku&quot;,&quot;_2&quot;:2},{&quot;_1&quot;:&quot;de&quot;,&quot;_2&quot;:61},{&quot;_1&quot;:&quot;no&quot;,&quot;_2&quot;:12},{&quot;_1&quot;:&quot;ms&quot;,&quot;_2&quot;:1},{&quot;_1&quot;:&quot;zh&quot;,&quot;_2&quot;:27},{&quot;_1&quot;:&quot;fi&quot;,&quot;_2&quot;:9},{&quot;_1&quot;:&quot;fr&quot;,&quot;_2&quot;:193},{&quot;_1&quot;:&quot;tl&quot;,&quot;_2&quot;:5},{&quot;_1&quot;:&quot;uz&quot;,&quot;_2&quot;:2},{&quot;_1&quot;:&quot;ar&quot;,&quot;_2&quot;:5},{&quot;_1&quot;:&quot;sv&quot;,&quot;_2&quot;:40},{&quot;_1&quot;:&quot;tr&quot;,&quot;_2&quot;:5},{&quot;_1&quot;:&quot;en&quot;,&quot;_2&quot;:5725},{&quot;_1&quot;:&quot;fa&quot;,&quot;_2&quot;:13},{&quot;_1&quot;:&quot;uk&quot;,&quot;_2&quot;:3},{&quot;_1&quot;:&quot;ca&quot;,&quot;_2&quot;:5},{&quot;_1&quot;:&quot;pt&quot;,&quot;_2&quot;:19},{&quot;_1&quot;:&quot;bn&quot;,&quot;_2&quot;:5},{&quot;_1&quot;:&quot;et&quot;,&quot;_2&quot;:1},{&quot;_1&quot;:&quot;cs&quot;,&quot;_2&quot;:1},{&quot;_1&quot;:&quot;gu&quot;,&quot;_2&quot;:2},{&quot;_1&quot;:&quot;he&quot;,&quot;_2&quot;:5},{&quot;_1&quot;:&quot;ta&quot;,&quot;_2&quot;:219},{&quot;_1&quot;:&quot;is&quot;,&quot;_2&quot;:12},{&quot;_1&quot;:&quot;ro&quot;,&quot;_2&quot;:6}],&quot;genId&quot;:&quot;1943901135&quot;}\" type=\"text/x-scoped-javascript\">/*<![CDATA[*/req(['../javascripts/notebook/playground','../javascripts/notebook/magic/barChart'], \n      function(playground, _magicbarChart) {\n        // data ==> data-this (in observable.js's scopedEval) ==> this in JS => { dataId, dataInit, ... }\n        // this ==> scope (in observable.js's scopedEval) ==> this.parentElement ==> div.container below (toHtml)\n\n        playground.call(data,\n                        this\n                        ,\n                        {\n    \"f\": _magicbarChart,\n    \"o\": {\"x\":\"_1\",\"y\":\"_2\",\"width\":600,\"height\":400}\n  }\n  \n                        \n                        \n                      );\n      }\n    );/*]]>*/</script>\n    <div>\n      <span class=\"chart-total-item-count\"><p data-bind=\"text: value\"><script data-this=\"{&quot;valueId&quot;:&quot;anon974f4b9d040c949f7d40da5f0a7390b8&quot;,&quot;initialValue&quot;:&quot;49&quot;}\" type=\"text/x-scoped-javascript\">/*<![CDATA[*/\nreq(\n['observable', 'knockout'],\nfunction (O, ko) {\n  ko.applyBindings({\n      value: O.makeObservable(valueId, initialValue)\n    },\n    this\n  );\n});\n        /*]]>*/</script></p> entries total</span>\n      <span class=\"chart-sampling-warning\"><p data-bind=\"text: value\"><script data-this=\"{&quot;valueId&quot;:&quot;anon6038bae73011dca11817bad0392cae1b&quot;,&quot;initialValue&quot;:&quot;&quot;}\" type=\"text/x-scoped-javascript\">/*<![CDATA[*/\nreq(\n['observable', 'knockout'],\nfunction (O, ko) {\n  ko.applyBindings({\n      value: O.makeObservable(valueId, initialValue)\n    },\n    this\n  );\n});\n        /*]]>*/</script></p></span>\n      <div>\n      </div>\n    </div></div>\n            </div><div class=\"tab-pane\" id=\"tab1709966776-2\">\n            <div>\n      <script data-this=\"{&quot;dataId&quot;:&quot;anonfde833c74a8192c10776f26efff20c34&quot;,&quot;dataInit&quot;:[{&quot;_1&quot;:&quot;kn&quot;,&quot;_2&quot;:1},{&quot;_1&quot;:&quot;id&quot;,&quot;_2&quot;:7},{&quot;_1&quot;:&quot;ur&quot;,&quot;_2&quot;:3},{&quot;_1&quot;:&quot;ru&quot;,&quot;_2&quot;:20},{&quot;_1&quot;:&quot;ml&quot;,&quot;_2&quot;:17},{&quot;_1&quot;:&quot;mr&quot;,&quot;_2&quot;:3},{&quot;_1&quot;:&quot;cn&quot;,&quot;_2&quot;:31},{&quot;_1&quot;:&quot;da&quot;,&quot;_2&quot;:36},{&quot;_1&quot;:&quot;nb&quot;,&quot;_2&quot;:3},{&quot;_1&quot;:&quot;sr&quot;,&quot;_2&quot;:11},{&quot;_1&quot;:&quot;hi&quot;,&quot;_2&quot;:27},{&quot;_1&quot;:&quot;el&quot;,&quot;_2&quot;:2},{&quot;_1&quot;:&quot;pl&quot;,&quot;_2&quot;:2},{&quot;_1&quot;:&quot;it&quot;,&quot;_2&quot;:126},{&quot;_1&quot;:&quot;hu&quot;,&quot;_2&quot;:8},{&quot;_1&quot;:&quot;th&quot;,&quot;_2&quot;:7},{&quot;_1&quot;:&quot;bs&quot;,&quot;_2&quot;:4},{&quot;_1&quot;:&quot;ja&quot;,&quot;_2&quot;:163},{&quot;_1&quot;:&quot;nl&quot;,&quot;_2&quot;:12},{&quot;_1&quot;:&quot;ko&quot;,&quot;_2&quot;:49},{&quot;_1&quot;:&quot;ab&quot;,&quot;_2&quot;:1},{&quot;_1&quot;:&quot;te&quot;,&quot;_2&quot;:7},{&quot;_1&quot;:&quot;lt&quot;,&quot;_2&quot;:1},{&quot;_1&quot;:&quot;es&quot;,&quot;_2&quot;:101},{&quot;_1&quot;:&quot;ku&quot;,&quot;_2&quot;:2},{&quot;_1&quot;:&quot;de&quot;,&quot;_2&quot;:61},{&quot;_1&quot;:&quot;no&quot;,&quot;_2&quot;:12},{&quot;_1&quot;:&quot;ms&quot;,&quot;_2&quot;:1},{&quot;_1&quot;:&quot;zh&quot;,&quot;_2&quot;:27},{&quot;_1&quot;:&quot;fi&quot;,&quot;_2&quot;:9},{&quot;_1&quot;:&quot;fr&quot;,&quot;_2&quot;:193},{&quot;_1&quot;:&quot;tl&quot;,&quot;_2&quot;:5},{&quot;_1&quot;:&quot;uz&quot;,&quot;_2&quot;:2},{&quot;_1&quot;:&quot;ar&quot;,&quot;_2&quot;:5},{&quot;_1&quot;:&quot;sv&quot;,&quot;_2&quot;:40},{&quot;_1&quot;:&quot;tr&quot;,&quot;_2&quot;:5},{&quot;_1&quot;:&quot;en&quot;,&quot;_2&quot;:5725},{&quot;_1&quot;:&quot;fa&quot;,&quot;_2&quot;:13},{&quot;_1&quot;:&quot;uk&quot;,&quot;_2&quot;:3},{&quot;_1&quot;:&quot;ca&quot;,&quot;_2&quot;:5},{&quot;_1&quot;:&quot;pt&quot;,&quot;_2&quot;:19},{&quot;_1&quot;:&quot;bn&quot;,&quot;_2&quot;:5},{&quot;_1&quot;:&quot;et&quot;,&quot;_2&quot;:1},{&quot;_1&quot;:&quot;cs&quot;,&quot;_2&quot;:1},{&quot;_1&quot;:&quot;gu&quot;,&quot;_2&quot;:2},{&quot;_1&quot;:&quot;he&quot;,&quot;_2&quot;:5},{&quot;_1&quot;:&quot;ta&quot;,&quot;_2&quot;:219},{&quot;_1&quot;:&quot;is&quot;,&quot;_2&quot;:12},{&quot;_1&quot;:&quot;ro&quot;,&quot;_2&quot;:6}],&quot;genId&quot;:&quot;974505625&quot;}\" type=\"text/x-scoped-javascript\">/*<![CDATA[*/req(['../javascripts/notebook/playground','../javascripts/notebook/magic/pieChart'], \n      function(playground, _magicpieChart) {\n        // data ==> data-this (in observable.js's scopedEval) ==> this in JS => { dataId, dataInit, ... }\n        // this ==> scope (in observable.js's scopedEval) ==> this.parentElement ==> div.container below (toHtml)\n\n        playground.call(data,\n                        this\n                        ,\n                        {\n    \"f\": _magicpieChart,\n    \"o\": {\"series\":\"_1\",\"p\":\"_2\",\"width\":600,\"height\":400}\n  }\n  \n                        \n                        \n                      );\n      }\n    );/*]]>*/</script>\n    <div>\n      <span class=\"chart-total-item-count\"><p data-bind=\"text: value\"><script data-this=\"{&quot;valueId&quot;:&quot;anon6171ff02d51b51358a99910fb493b14b&quot;,&quot;initialValue&quot;:&quot;49&quot;}\" type=\"text/x-scoped-javascript\">/*<![CDATA[*/\nreq(\n['observable', 'knockout'],\nfunction (O, ko) {\n  ko.applyBindings({\n      value: O.makeObservable(valueId, initialValue)\n    },\n    this\n  );\n});\n        /*]]>*/</script></p> entries total</span>\n      <span class=\"chart-sampling-warning\"><p data-bind=\"text: value\"><script data-this=\"{&quot;valueId&quot;:&quot;anon6d90cc2e212b9c1fa10922ea86c3c7b6&quot;,&quot;initialValue&quot;:&quot;&quot;}\" type=\"text/x-scoped-javascript\">/*<![CDATA[*/\nreq(\n['observable', 'knockout'],\nfunction (O, ko) {\n  ko.applyBindings({\n      value: O.makeObservable(valueId, initialValue)\n    },\n    this\n  );\n});\n        /*]]>*/</script></p></span>\n      <div>\n      </div>\n    </div></div>\n            </div><div class=\"tab-pane\" id=\"tab1709966776-3\">\n            <div>\n      <script data-this=\"{&quot;dataId&quot;:&quot;anonebc5dc94764a4f21729950e5ac5a69e3&quot;,&quot;dataInit&quot;:[{&quot;_1&quot;:&quot;kn&quot;,&quot;_2&quot;:1},{&quot;_1&quot;:&quot;id&quot;,&quot;_2&quot;:7},{&quot;_1&quot;:&quot;ur&quot;,&quot;_2&quot;:3},{&quot;_1&quot;:&quot;ru&quot;,&quot;_2&quot;:20},{&quot;_1&quot;:&quot;ml&quot;,&quot;_2&quot;:17},{&quot;_1&quot;:&quot;mr&quot;,&quot;_2&quot;:3},{&quot;_1&quot;:&quot;cn&quot;,&quot;_2&quot;:31},{&quot;_1&quot;:&quot;da&quot;,&quot;_2&quot;:36},{&quot;_1&quot;:&quot;nb&quot;,&quot;_2&quot;:3},{&quot;_1&quot;:&quot;sr&quot;,&quot;_2&quot;:11},{&quot;_1&quot;:&quot;hi&quot;,&quot;_2&quot;:27},{&quot;_1&quot;:&quot;el&quot;,&quot;_2&quot;:2},{&quot;_1&quot;:&quot;pl&quot;,&quot;_2&quot;:2},{&quot;_1&quot;:&quot;it&quot;,&quot;_2&quot;:126},{&quot;_1&quot;:&quot;hu&quot;,&quot;_2&quot;:8},{&quot;_1&quot;:&quot;th&quot;,&quot;_2&quot;:7},{&quot;_1&quot;:&quot;bs&quot;,&quot;_2&quot;:4},{&quot;_1&quot;:&quot;ja&quot;,&quot;_2&quot;:163},{&quot;_1&quot;:&quot;nl&quot;,&quot;_2&quot;:12},{&quot;_1&quot;:&quot;ko&quot;,&quot;_2&quot;:49},{&quot;_1&quot;:&quot;ab&quot;,&quot;_2&quot;:1},{&quot;_1&quot;:&quot;te&quot;,&quot;_2&quot;:7},{&quot;_1&quot;:&quot;lt&quot;,&quot;_2&quot;:1},{&quot;_1&quot;:&quot;es&quot;,&quot;_2&quot;:101},{&quot;_1&quot;:&quot;ku&quot;,&quot;_2&quot;:2},{&quot;_1&quot;:&quot;de&quot;,&quot;_2&quot;:61},{&quot;_1&quot;:&quot;no&quot;,&quot;_2&quot;:12},{&quot;_1&quot;:&quot;ms&quot;,&quot;_2&quot;:1},{&quot;_1&quot;:&quot;zh&quot;,&quot;_2&quot;:27},{&quot;_1&quot;:&quot;fi&quot;,&quot;_2&quot;:9},{&quot;_1&quot;:&quot;fr&quot;,&quot;_2&quot;:193},{&quot;_1&quot;:&quot;tl&quot;,&quot;_2&quot;:5},{&quot;_1&quot;:&quot;uz&quot;,&quot;_2&quot;:2},{&quot;_1&quot;:&quot;ar&quot;,&quot;_2&quot;:5},{&quot;_1&quot;:&quot;sv&quot;,&quot;_2&quot;:40},{&quot;_1&quot;:&quot;tr&quot;,&quot;_2&quot;:5},{&quot;_1&quot;:&quot;en&quot;,&quot;_2&quot;:5725},{&quot;_1&quot;:&quot;fa&quot;,&quot;_2&quot;:13},{&quot;_1&quot;:&quot;uk&quot;,&quot;_2&quot;:3},{&quot;_1&quot;:&quot;ca&quot;,&quot;_2&quot;:5},{&quot;_1&quot;:&quot;pt&quot;,&quot;_2&quot;:19},{&quot;_1&quot;:&quot;bn&quot;,&quot;_2&quot;:5},{&quot;_1&quot;:&quot;et&quot;,&quot;_2&quot;:1},{&quot;_1&quot;:&quot;cs&quot;,&quot;_2&quot;:1},{&quot;_1&quot;:&quot;gu&quot;,&quot;_2&quot;:2},{&quot;_1&quot;:&quot;he&quot;,&quot;_2&quot;:5},{&quot;_1&quot;:&quot;ta&quot;,&quot;_2&quot;:219},{&quot;_1&quot;:&quot;is&quot;,&quot;_2&quot;:12},{&quot;_1&quot;:&quot;ro&quot;,&quot;_2&quot;:6}],&quot;genId&quot;:&quot;263497874&quot;}\" type=\"text/x-scoped-javascript\">/*<![CDATA[*/req(['../javascripts/notebook/playground','../javascripts/notebook/magic/pivotChart'], \n      function(playground, _magicpivotChart) {\n        // data ==> data-this (in observable.js's scopedEval) ==> this in JS => { dataId, dataInit, ... }\n        // this ==> scope (in observable.js's scopedEval) ==> this.parentElement ==> div.container below (toHtml)\n\n        playground.call(data,\n                        this\n                        ,\n                        {\n    \"f\": _magicpivotChart,\n    \"o\": {\"width\":600,\"height\":400,\"derivedAttributes\":{},\"extraOptions\":{}}\n  }\n  \n                        \n                        \n                      );\n      }\n    );/*]]>*/</script>\n    <div>\n      <span class=\"chart-total-item-count\"><p data-bind=\"text: value\"><script data-this=\"{&quot;valueId&quot;:&quot;anon15240d8b028ce3563f4bf9293b7ed1cc&quot;,&quot;initialValue&quot;:&quot;49&quot;}\" type=\"text/x-scoped-javascript\">/*<![CDATA[*/\nreq(\n['observable', 'knockout'],\nfunction (O, ko) {\n  ko.applyBindings({\n      value: O.makeObservable(valueId, initialValue)\n    },\n    this\n  );\n});\n        /*]]>*/</script></p> entries total</span>\n      <span class=\"chart-sampling-warning\"><p data-bind=\"text: value\"><script data-this=\"{&quot;valueId&quot;:&quot;anon963a08e87392618b10209b607b7505c3&quot;,&quot;initialValue&quot;:&quot;&quot;}\" type=\"text/x-scoped-javascript\">/*<![CDATA[*/\nreq(\n['observable', 'knockout'],\nfunction (O, ko) {\n  ko.applyBindings({\n      value: O.makeObservable(valueId, initialValue)\n    },\n    this\n  );\n});\n        /*]]>*/</script></p></span>\n      <div>\n      </div>\n    </div></div>\n            </div></div>\n      </div>\n    </div></div>"
+      },
+      "output_type" : "execute_result",
+      "execution_count" : 13,
+      "time" : "Took: 2 seconds 99 milliseconds, at 2017-7-9 20:24"
+    } ]
+  }, {
+    "metadata" : {
+      "trusted" : true,
+      "input_collapsed" : false,
+      "collapsed" : true,
+      "id" : "83E60350591441708400BA73AFF61562"
+    },
+    "cell_type" : "code",
+    "source" : "",
+    "outputs" : [ ]
+  } ],
+  "nbformat" : 4
+}
