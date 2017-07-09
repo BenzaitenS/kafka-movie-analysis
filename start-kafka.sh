@@ -98,8 +98,6 @@ finish() {
     sleep 5
     sh $ZOO_STOP_SCRIPT
 
-    # Stops the notebook
-    sudo docker stop docker-notebook
 }
 
 trap finish SIGINT SIGTERM EXIT

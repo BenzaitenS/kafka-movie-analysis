@@ -17,7 +17,6 @@ import org.apache.spark.rdd._
 import play.api.libs.json._
 
 import com.sparkmovie.utils.CommandLineParser
-import com.sparkmovie.utils.MovieUtils
 import com.sparkmovie.utils.SparkKafkaUtils
 
 object SparkConsumer {
