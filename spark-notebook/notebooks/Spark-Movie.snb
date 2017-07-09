@@ -18,26 +18,44 @@
   },
   "cells" : [ {
     "metadata" : {
+      "id" : "C86DB2E757514494BDCAC81D39E7CA1A"
+    },
+    "cell_type" : "markdown",
+    "source" : "# Spark Movie Notebook: Sentiment Analysis"
+  }, {
+    "metadata" : {
+      "id" : "B142C249273549C5B3674E7840897A1A"
+    },
+    "cell_type" : "markdown",
+    "source" : "## Includes Dependencies"
+  }, {
+    "metadata" : {
       "trusted" : true,
       "input_collapsed" : false,
       "collapsed" : false,
       "id" : "002FD47C8387498C8898D38143240A59"
     },
     "cell_type" : "code",
-    "source" : "import org.apache.spark.SparkConf\nimport org.apache.spark.streaming.kafka.KafkaUtils\nimport org.apache.spark.streaming.{Seconds, StreamingContext}\nimport kafka.serializer.StringDecoder\nimport org.apache.kafka.common.serialization.StringDeserializer\n//import play.api.libs.json._\nimport play.api.libs.json.Json",
+    "source" : "import org.apache.spark.SparkConf\nimport org.apache.spark.streaming.kafka.KafkaUtils\nimport org.apache.spark.streaming.{Seconds, StreamingContext}\nimport org.apache.spark.streaming.StreamingContext._\nimport kafka.serializer.StringDecoder\nimport org.apache.kafka.common.serialization.StringDeserializer\n\nimport play.api.libs.json.Json\n\nimport notebook.front.widgets.magic\nimport notebook.front.widgets.magic._\nimport notebook.front.widgets.magic.Implicits._\nimport notebook.front.widgets.magic.SamplerImplicits._\n\nimport scala.collection.parallel.mutable.ParHashMap",
     "outputs" : [ {
       "name" : "stdout",
       "output_type" : "stream",
-      "text" : "import org.apache.spark.SparkConf\nimport org.apache.spark.streaming.kafka.KafkaUtils\nimport org.apache.spark.streaming.{Seconds, StreamingContext}\nimport kafka.serializer.StringDecoder\nimport org.apache.kafka.common.serialization.StringDeserializer\nimport play.api.libs.json.Json\n"
+      "text" : "import org.apache.spark.SparkConf\nimport org.apache.spark.streaming.kafka.KafkaUtils\nimport org.apache.spark.streaming.{Seconds, StreamingContext}\nimport org.apache.spark.streaming.StreamingContext._\nimport kafka.serializer.StringDecoder\nimport org.apache.kafka.common.serialization.StringDeserializer\nimport play.api.libs.json.Json\nimport notebook.front.widgets.magic\nimport notebook.front.widgets.magic._\nimport notebook.front.widgets.magic.Implicits._\nimport notebook.front.widgets.magic.SamplerImplicits._\nimport scala.collection.parallel.mutable.ParHashMap\n"
     }, {
       "metadata" : { },
       "data" : {
         "text/html" : ""
       },
       "output_type" : "execute_result",
-      "execution_count" : 1,
-      "time" : "Took: 3 seconds 888 milliseconds, at 2017-7-8 20:29"
+      "execution_count" : 9,
+      "time" : "Took: 2 seconds 155 milliseconds, at 2017-7-9 16:52"
     } ]
+  }, {
+    "metadata" : {
+      "id" : "C0E0406836F047ECBB2D9B0EC96B42F4"
+    },
+    "cell_type" : "markdown",
+    "source" : "## Json Case Class"
   }, {
     "metadata" : {
       "trusted" : true,
@@ -46,20 +64,62 @@
       "id" : "C21023AFFE0742FE86B341B55DD91620"
     },
     "cell_type" : "code",
-    "source" : "  case class Review (\n    author : String,\n    id : String,\n    url : String,\n    content : String,\n    analysis : Int\n  )\n  object Review {\n    implicit val reviewFormat = play.api.libs.json.Json.format[Review]\n  }\n\n  case class MovieRaw (\n    id : Int,\n    original_title : String,\n    title : String,\n    overview : String,\n    original_language : String,\n    release_date : String,\n    popularity : Double,\n    review_popularity : Double,\n    vote_average : Double,\n    vote_count : Int,\n    reviews : List[Review],\n    genre_ids : List[Int],\n    video : Boolean\n  )\n  object MovieRaw {\n    implicit val movieFormat = play.api.libs.json.Json.format[MovieRaw]\n  }",
+    "source" : "\nobject Review extends Serializable {\n  case class Review (\n    author : String,\n    id : String,\n    url : String,\n    content : String,\n    analysis : Int\n  ) extends Serializable \n  @transient implicit val Reads = Json.reads[Review]\n}\n\nobject MovieRaw extends Serializable  {\n  case class MovieRaw (\n    id : Int,\n    original_title : String,\n    title : String,\n    overview : String,\n    original_language : String,\n    release_date : String,\n    review_popularity : Float,\n    popularity : Float,\n    vote_average : Float,\n    vote_count : Int,\n    reviews : List[Review.Review],\n    genre_ids : List[Int],\n    video : Boolean\n  ) extends Serializable\n  @transient implicit val Reads = Json.reads[MovieRaw]\n}\n\ndef stringToMovie(str: String) : Option[MovieRaw.MovieRaw] = {\n  try {\n    Some(Json.fromJson[MovieRaw.MovieRaw](Json.parse(str)).get)\n  } catch {\n    case e: Exception => {print(\"x1\"); None}\n  }\n}",
     "outputs" : [ {
       "name" : "stdout",
       "output_type" : "stream",
-      "text" : "defined class Review\ndefined object Review\ndefined class MovieRaw\ndefined object MovieRaw\n"
+      "text" : "defined object Review\ndefined object MovieRaw\nstringToMovie: (str: String)Option[MovieRaw.MovieRaw]\n"
     }, {
       "metadata" : { },
       "data" : {
         "text/html" : ""
       },
       "output_type" : "execute_result",
-      "execution_count" : 2,
-      "time" : "Took: 4 seconds 968 milliseconds, at 2017-7-8 20:30"
+      "execution_count" : 10,
+      "time" : "Took: 3 seconds 759 milliseconds, at 2017-7-9 16:52"
     } ]
+  }, {
+    "metadata" : {
+      "trusted" : true,
+      "input_collapsed" : false,
+      "collapsed" : false,
+      "id" : "C79734619313483F99154AF729C1AC8D"
+    },
+    "cell_type" : "code",
+    "source" : "",
+    "outputs" : [ {
+      "metadata" : { },
+      "data" : {
+        "text/html" : ""
+      },
+      "output_type" : "execute_result",
+      "execution_count" : 11,
+      "time" : "Took: 3 seconds 350 milliseconds, at 2017-7-9 16:52"
+    } ]
+  }, {
+    "metadata" : {
+      "trusted" : true,
+      "input_collapsed" : false,
+      "collapsed" : false,
+      "id" : "EE16964E4E444B4E837068EE8DBCB37F"
+    },
+    "cell_type" : "code",
+    "source" : "",
+    "outputs" : [ {
+      "metadata" : { },
+      "data" : {
+        "text/html" : ""
+      },
+      "output_type" : "execute_result",
+      "execution_count" : 12,
+      "time" : "Took: 3 seconds 287 milliseconds, at 2017-7-9 16:52"
+    } ]
+  }, {
+    "metadata" : {
+      "id" : "1DCAE991FA624E83A5A2D5F513D71748"
+    },
+    "cell_type" : "markdown",
+    "source" : "## Connect To Kafka Data"
   }, {
     "metadata" : {
       "trusted" : true,
@@ -79,8 +139,8 @@
         "text/html" : ""
       },
       "output_type" : "execute_result",
-      "execution_count" : 3,
-      "time" : "Took: 3 seconds 247 milliseconds, at 2017-7-8 20:30"
+      "execution_count" : 13,
+      "time" : "Took: 2 seconds 209 milliseconds, at 2017-7-9 16:52"
     } ]
   }, {
     "metadata" : {
@@ -90,19 +150,53 @@
       "id" : "9FB2D49218394BE1B4B9D52E777F3976"
     },
     "cell_type" : "code",
-    "source" : "val ssc = StreamingContext.getActiveOrCreate(() => new StreamingContext(sc, Seconds(10)))\n\n//val kafkaParams = Map[String, String](\"bootstrap.servers\" -> brokers)\nval kafkaParams = Map[String, String] (\n  \"bootstrap.servers\" -> brokers,\n  \"group.id\" -> \"my-group\",\n  \"auto.offset.reset\" -> \"smallest\",\n  \"enable.auto.commit\" -> \"false\"\n)\n\nval stream = KafkaUtils.createDirectStream[String, String, StringDecoder, StringDecoder](\n      ssc, kafkaParams, Set(topic)\n)",
+    "source" : "@transient val ssc = StreamingContext.getActiveOrCreate(() => new StreamingContext(sc, Seconds(10)))\n\n//val kafkaParams = Map[String, String](\"bootstrap.servers\" -> brokers)\nval kafkaParams = Map[String, String] (\n  \"bootstrap.servers\" -> brokers,\n  \"group.id\" -> \"my-group\",\n  \"auto.offset.reset\" -> \"smallest\",\n  \"enable.auto.commit\" -> \"false\"\n)\n\nval stream = KafkaUtils.createDirectStream[String, String, StringDecoder, StringDecoder](ssc, kafkaParams, Set(topic))",
     "outputs" : [ {
       "name" : "stdout",
       "output_type" : "stream",
-      "text" : "ssc: org.apache.spark.streaming.StreamingContext = org.apache.spark.streaming.StreamingContext@62b4472a\nkafkaParams: scala.collection.immutable.Map[String,String] = Map(bootstrap.servers -> localhost:9092, group.id -> my-group, auto.offset.reset -> smallest, enable.auto.commit -> false)\nstream: org.apache.spark.streaming.dstream.InputDStream[(String, String)] = org.apache.spark.streaming.kafka.DirectKafkaInputDStream@1647f9d\n"
+      "text" : "ssc: org.apache.spark.streaming.StreamingContext = org.apache.spark.streaming.StreamingContext@57ad992f\nkafkaParams: scala.collection.immutable.Map[String,String] = Map(bootstrap.servers -> localhost:9092, group.id -> my-group, auto.offset.reset -> smallest, enable.auto.commit -> false)\nstream: org.apache.spark.streaming.dstream.InputDStream[(String, String)] = org.apache.spark.streaming.kafka.DirectKafkaInputDStream@47d1ec58\n"
     }, {
       "metadata" : { },
       "data" : {
         "text/html" : ""
       },
       "output_type" : "execute_result",
-      "execution_count" : 27,
-      "time" : "Took: 3 seconds 314 milliseconds, at 2017-7-8 20:45"
+      "execution_count" : 14,
+      "time" : "Took: 2 seconds 357 milliseconds, at 2017-7-9 16:53"
+    } ]
+  }, {
+    "metadata" : {
+      "id" : "BE700144BF3F437B83E91BC4D258FE42"
+    },
+    "cell_type" : "markdown",
+    "source" : "## Map-Reduce Processing"
+  }, {
+    "metadata" : {
+      "id" : "618DDA4F3EFA4376BF09F1CC56801B41"
+    },
+    "cell_type" : "markdown",
+    "source" : "### Data Container Creation"
+  }, {
+    "metadata" : {
+      "trusted" : true,
+      "input_collapsed" : false,
+      "collapsed" : false,
+      "id" : "CD5E641883C748E48416E7980576AB3E"
+    },
+    "cell_type" : "code",
+    "source" : "val byYearMovie = new ParHashMap[String, Int]()\ndef addToMap(str : String, v : Int, map : ParHashMap[String, Int]) {\n  //byYearMovie(str) = byYearMovie(str) + v\n  if (map.get(str).isEmpty) {\n      map.put(str, 0)\n  }\n  map.put(str, map(str) + v)\n}\n//byYearMovie(\"testtttt\") = byYearMovie(\"testtttt\") + 1",
+    "outputs" : [ {
+      "name" : "stdout",
+      "output_type" : "stream",
+      "text" : "byYearMovie: scala.collection.parallel.mutable.ParHashMap[String,Int] = ParHashMap()\naddToMap: (str: String, v: Int, map: scala.collection.parallel.mutable.ParHashMap[String,Int])Unit\n"
+    }, {
+      "metadata" : { },
+      "data" : {
+        "text/html" : ""
+      },
+      "output_type" : "execute_result",
+      "execution_count" : 15,
+      "time" : "Took: 1 second 973 milliseconds, at 2017-7-9 16:53"
     } ]
   }, {
     "metadata" : {
@@ -112,19 +206,47 @@
       "id" : "3E67AA5A8C664319883A11CA7E2C62B2"
     },
     "cell_type" : "code",
-    "source" : "/*val toJson = stream.map(_._2)\n                    .map(Json.parse(_).as[MovieRaw])*/\n\nstream.foreachRDD { rdd =>\n  \n  if (rdd.isEmpty()) {\n    ssc.stop()\n  } else {\n    println(rdd.count())\n  }\n  \n  rdd.map(x => x.toString())\n    .map(Json.parse(_).as[MovieRaw])\n  /*.foreachPartition(partition => {\n      \n      \n      \n  })*/\n\n  \n  //rdd.&foreach(x => println(x.original_title))\n  /*rdd.map(movie => (movie.original_language, movie))\n                        .groupByKey()\n                        .collect()*/\n\n  \n}\n\n//stream.count().print()\n\n/*val byLanguages = toJson.map(movie => (movie.original_language, movie))\n                        .groupByKey()\n                        .collect()*/\n\nssc.start()\nssc.awaitTermination()",
+    "source" : "//val toJson = stream.map(_._2).map(Json.parse(_).as[MovieRaw.MovieRaw]).print()\nstream.map(_._2).foreachRDD { rdd => {\n  if (rdd.isEmpty()) {\n    println(\"empty :(\")\n    ssc.stop()\n  }\n  else {\n    //rdd.map(x => x._2)\n    rdd.flatMap(x => {\n      try {\n        print(x)\n        stringToMovie(x)\n      } catch {\n        case e: Exception => {print(\"x\"); None}\n      }\n    }).count()\n    //.groupBy(x => x.original_language)\n    //.map(x => (x._1, x._2.size))\n    //.collect()\n    //.foreach(x => addToMap(x._1, x._2, byYearMovie))\n  }\n  }\n}\n\nssc.start()\nssc.awaitTermination()",
     "outputs" : [ {
       "name" : "stdout",
       "output_type" : "stream",
-      "text" : "7021\n"
-    }, {
+      "text" : "java.lang.IllegalStateException: Adding new inputs, transformations, and output operations after stopping a context is not supported\n  at org.apache.spark.streaming.dstream.DStream.validateAtInit(DStream.scala:227)\n  at org.apache.spark.streaming.dstream.DStream.<init>(DStream.scala:65)\n  at org.apache.spark.streaming.dstream.MappedDStream.<init>(MappedDStream.scala:29)\n  at org.apache.spark.streaming.dstream.DStream$$anonfun$map$1.apply(DStream.scala:546)\n  at org.apache.spark.streaming.dstream.DStream$$anonfun$map$1.apply(DStream.scala:546)\n  at org.apache.spark.rdd.RDDOperationScope$.withScope(RDDOperationScope.scala:151)\n  at org.apache.spark.rdd.RDDOperationScope$.withScope(RDDOperationScope.scala:112)\n  at org.apache.spark.SparkContext.withScope(SparkContext.scala:701)\n  at org.apache.spark.streaming.StreamingContext.withScope(StreamingContext.scala:264)\n  at org.apache.spark.streaming.dstream.DStream.map(DStream.scala:545)\n  ... 79 elided\n"
+    } ]
+  }, {
+    "metadata" : {
+      "trusted" : true,
+      "input_collapsed" : false,
+      "collapsed" : false,
+      "id" : "65C8CB6640274EFAB6146D1E49C1B464"
+    },
+    "cell_type" : "code",
+    "source" : "",
+    "outputs" : [ {
       "metadata" : { },
       "data" : {
         "text/html" : ""
       },
       "output_type" : "execute_result",
-      "execution_count" : 28,
-      "time" : "Took: 20 seconds 556 milliseconds, at 2017-7-8 20:45"
+      "execution_count" : 17,
+      "time" : "Took: 2 seconds 211 milliseconds, at 2017-7-9 16:53"
+    } ]
+  }, {
+    "metadata" : {
+      "trusted" : true,
+      "input_collapsed" : false,
+      "collapsed" : false,
+      "id" : "F725E7A5818A480C8E071968F0865581"
+    },
+    "cell_type" : "code",
+    "source" : "",
+    "outputs" : [ {
+      "metadata" : { },
+      "data" : {
+        "text/html" : ""
+      },
+      "output_type" : "execute_result",
+      "execution_count" : 18,
+      "time" : "Took: 2 seconds 489 milliseconds, at 2017-7-9 16:53"
     } ]
   }, {
     "metadata" : {
@@ -141,15 +263,33 @@
         "text/html" : ""
       },
       "output_type" : "execute_result",
-      "execution_count" : 26,
-      "time" : "Took: 3 seconds 758 milliseconds, at 2017-7-8 20:44"
+      "execution_count" : 19,
+      "time" : "Took: 2 seconds 817 milliseconds, at 2017-7-9 16:53"
+    } ]
+  }, {
+    "metadata" : {
+      "trusted" : true,
+      "input_collapsed" : false,
+      "collapsed" : false,
+      "id" : "A43A25061F65407C869F2BA24BC27451"
+    },
+    "cell_type" : "code",
+    "source" : "",
+    "outputs" : [ {
+      "metadata" : { },
+      "data" : {
+        "text/html" : ""
+      },
+      "output_type" : "execute_result",
+      "execution_count" : 20,
+      "time" : "Took: 2 seconds 535 milliseconds, at 2017-7-9 16:53"
     } ]
   }, {
     "metadata" : {
       "trusted" : true,
       "input_collapsed" : false,
       "collapsed" : true,
-      "id" : "A43A25061F65407C869F2BA24BC27451"
+      "id" : "E82479293BDD4EE289A3FF3AAF51D0C9"
     },
     "cell_type" : "code",
     "source" : "",
