@@ -15,9 +15,9 @@ def parse_args():
                     Fetches data from a file or from an API and stream the
                     Json response to kafka
                     """
-    
+
     arg_parser = argparse.ArgumentParser(description=description)
-    
+
     # Register arguments
     arg_parser.add_argument('-i', '--input',
                             help='Input file used to stream content in kafka',
@@ -44,13 +44,13 @@ def stream_file(args, kafka_handler, topic):
         for line in f:
             data = json.loads(line)
             kafka_handler.produce(json.dumps(data), topic)
-            if nb >= args.number:
+            if not (args.number is None) and nb >= int(args.number):
                 break
         kafka_handler.flush()
 
 def stream_from_api(kafka_handler, topic):
     THEMOVIEDB_API_TOKEN = "2cde1ceaa291c9271e32272dc26200fe"
-    
+
     MOVIES_ROUTE_API = "https://api.themoviedb.org/3/discover/movie"
     REVIEW_ROUTE_API = "https://api.themoviedb.org/3/movie/{}/reviews"
     routes = {
@@ -66,7 +66,7 @@ def stream_from_api(kafka_handler, topic):
             print("[KAFKA] Movie `{}` pushed to topic \'{}\'".format(movie["title"], topic))
             kafka_handler.produce(string, topic)
         kafka_handler.flush()
-    
+
     MIN_YEAR = 2015
     MAX_YEAR = 2017
 
